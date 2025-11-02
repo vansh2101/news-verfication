@@ -159,7 +159,7 @@ export class NewsVerificationService {
       console.log('Searching for related articles...');
       
       // Generate search query from content
-      const searchQuery = newsApiService.generateSearchQuery(content);
+      const searchQuery = await newsApiService.generateSearchQuery(content);
       console.log('Search query:', searchQuery);
       
       if (!searchQuery.trim()) {
@@ -227,7 +227,7 @@ export class NewsVerificationService {
     const descLower = (article.description || '').toLowerCase();
     
     // Extract keywords from content
-    const keywords = newsApiService.extractKeywords(content);
+    const keywords = this.extractKeywords(content);
     
     // Check if article contains any of the keywords
     const relevanceScore = keywords.reduce((score, keyword) => {
@@ -238,6 +238,23 @@ export class NewsVerificationService {
     }, 0);
     
     return relevanceScore > 0 || titleLower.includes(contentLower.slice(0, 50));
+  }
+
+  private extractKeywords(text: string): string[] {
+    const stopWords = new Set([
+      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+      'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+      'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those'
+    ]);
+
+    const words = text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .split(/\s+/)
+      .filter(word => word.length > 3 && !stopWords.has(word));
+
+    // Return top 5 most relevant words
+    return [...new Set(words)].slice(0, 5);
   }
 
   private createFallbackClaims(content: string): Claim[] {
