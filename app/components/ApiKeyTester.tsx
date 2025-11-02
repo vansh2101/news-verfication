@@ -112,8 +112,8 @@ export function ApiKeyTester() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium text-gray-900">News API</h4>
-            <p className="text-sm text-gray-600">Tests news article search</p>
+            <h4 className="font-medium text-gray-900">SerpAPI (Google News)</h4>
+            <p className="text-sm text-gray-600">Tests news article search via Google News</p>
           </div>
           <div className="flex items-center gap-3">
             <Button 
@@ -122,7 +122,7 @@ export function ApiKeyTester() {
               size="sm"
               variant="outline"
             >
-              Test News API
+              Test SerpAPI
             </Button>
           </div>
         </div>
@@ -133,7 +133,7 @@ export function ApiKeyTester() {
         <h4 className="font-medium text-blue-900 mb-2">Setup Instructions:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>1. Get Gemini API key from: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">Google AI Studio</a></li>
-          <li>2. Get News API key from: <a href="https://newsapi.org/" target="_blank" rel="noopener noreferrer" className="underline">NewsAPI.org</a></li>
+          <li>2. Get SerpAPI key from: <a href="https://serpapi.com/" target="_blank" rel="noopener noreferrer" className="underline">SerpAPI.com</a></li>
           <li>3. Add both keys to your .env.local file</li>
           <li>4. Restart your development server</li>
         </ul>

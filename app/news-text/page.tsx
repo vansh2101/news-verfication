@@ -4,18 +4,7 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card } from "@/app/components/ui/card"
 import { Check, Loader2, ExternalLink } from "lucide-react"
-
-interface NewsArticle {
-  title: string;
-  description: string;
-  url: string;
-  urlToImage: string;
-  publishedAt: string;
-  source: {
-    name: string;
-  };
-  content: string;
-}
+import { newsApiService, NewsArticle } from "@/lib/newsApi"
 
 function TextNewsContent() {
   const searchParams = useSearchParams();
@@ -29,27 +18,13 @@ function TextNewsContent() {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const apiKey = process.env.NEXT_PUBLIC_NEWSAPI_KEY;
-        if (!apiKey) {
-          throw new Error("News API key is not configured");
-        }
-        const response = await fetch(
-          `https://newsapi.org/v2/everything?q=${encodeURIComponent(queryParam)}&language=en&sortBy=publishedAt&pageSize=20&apiKey=${apiKey}`
-        );
+        const articles = await newsApiService.searchNews(queryParam, 20);
         
-        if (!response.ok) {
-          throw new Error("Failed to fetch news");
-        }
-        
-        const data = await response.json();
-        
-        // Filter articles to only include those with images AND descriptions
-        const validArticles = (data.articles || []).filter(
+        // Filter articles to only include those with images and titles
+        const validArticles = (articles || []).filter(
           (article: NewsArticle) => 
             article.urlToImage && 
             article.urlToImage.trim() !== "" &&
-            article.description && 
-            article.description.trim() !== "" &&
             article.title &&
             article.title.trim() !== ""
         );

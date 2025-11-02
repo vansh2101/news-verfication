@@ -1,7 +1,15 @@
-interface NewsAPIResponse {
-  status: string;
-  totalResults: number;
-  articles: NewsArticle[];
+interface SerpAPIResponse {
+  news_results?: SerpNewsResult[];
+  error?: string;
+}
+
+interface SerpNewsResult {
+  title: string;
+  link: string;
+  source: string;
+  date: string;
+  snippet?: string;
+  thumbnail?: string;
 }
 
 export interface NewsArticle {
@@ -18,7 +26,7 @@ export interface NewsArticle {
   content: string | null;
 }
 
-export class NewsAPIService {
+export class SerpAPIService {
   constructor() {}
 
   async searchNews(query: string, pageSize: number = 20): Promise<NewsArticle[]> {
@@ -27,13 +35,13 @@ export class NewsAPIService {
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(`SerpAPI request failed: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
       
       if (data.error) {
-        throw new Error(`API error: ${data.error}`);
+        throw new Error(`SerpAPI error: ${data.error}`);
       }
 
       return data;
@@ -49,13 +57,13 @@ export class NewsAPIService {
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(`SerpAPI request failed: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
       
       if (data.error) {
-        throw new Error(`API error: ${data.error}`);
+        throw new Error(`SerpAPI error: ${data.error}`);
       }
 
       return data;
@@ -92,14 +100,14 @@ export class NewsAPIService {
   }
 }
 
-let _newsApiService: NewsAPIService | null = null;
+let _serpApiService: SerpAPIService | null = null;
 
 export const newsApiService = {
-  get instance(): NewsAPIService {
-    if (!_newsApiService) {
-      _newsApiService = new NewsAPIService();
+  get instance(): SerpAPIService {
+    if (!_serpApiService) {
+      _serpApiService = new SerpAPIService();
     }
-    return _newsApiService;
+    return _serpApiService;
   },
   
   // Proxy methods for easier access

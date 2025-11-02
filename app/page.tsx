@@ -8,17 +8,10 @@ import { NewsletterSubscribe } from "@/app/components/NewsletterSubscribe";
 import { Card } from "../app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { useRouter } from "next/navigation";
+import { newsApiService, NewsArticle as ImportedNewsArticle } from "@/lib/newsApi";
 
-interface NewsArticle {
-  source: { id: string | null; name: string };
-  author: string | null;
-  title: string;
-  description: string | null;
-  url: string;
-  urlToImage: string | null;
-  publishedAt: string;
-  content: string | null;
-}
+// Use the imported NewsArticle type
+type NewsArticle = ImportedNewsArticle;
 
 export default function NewsVerificationPage() {
   const [showModal, setShowModal] = useState(false);
@@ -30,27 +23,27 @@ export default function NewsVerificationPage() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const apiKey = process.env.NEXT_PUBLIC_NEWSAPI_KEY;
-        if (!apiKey) {
-          throw new Error("News API key is not configured");
-        }
-        const response = await fetch(
-          `https://newsapi.org/v2/top-headlines?country=us&pageSize=50&apiKey=${apiKey}`
-        );
-        const data = await response.json();
-        if (data.articles) {
-          // Filter articles to only include those with images AND descriptions
-          const validArticles = data.articles.filter(
+        console.log("Fetching news from SerpAPI...");
+        const articles = await newsApiService.getTopHeadlines('us', 50);
+        console.log("Raw articles received:", articles);
+        
+        if (articles) {
+          console.log(`Total articles: ${articles.length}`);
+          // Filter articles to only include those with images and titles
+          const validArticles = articles.filter(
             (article: NewsArticle) => 
               article.urlToImage && 
               article.urlToImage.trim() !== "" &&
-              article.description && 
-              article.description.trim() !== "" &&
               article.title &&
               article.title.trim() !== ""
           );
+          console.log(`Valid articles after filtering: ${validArticles.length}`);
           // Take first 10 valid articles
-          setArticles(validArticles.slice(0, 10));
+          const finalArticles = validArticles.slice(0, 10);
+          console.log("Final articles to display:", finalArticles);
+          setArticles(finalArticles);
+        } else {
+          console.log("No articles received");
         }
         setLoading(false);
       } catch (error) {

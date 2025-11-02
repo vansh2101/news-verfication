@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>News API Test</title>
+</head>
+<body>
+    <h1>Testing News Headlines API</h1>
+    <div id="articles"></div>
+    
+    <script>
+        async function testAPI() {
+            try {
+                console.log('Fetching headlines...');
+                const response = await fetch('/api/news/headlines?country=us&pageSize=5');
+                const articles = await response.json();
+                
+                console.log('Articles received:', articles);
+                
+                const container = document.getElementById('articles');
+                
+                if (articles && articles.length > 0) {
+                    articles.forEach(article => {
+                        const div = document.createElement('div');
+                        div.innerHTML = `
+                            <h3>${article.title}</h3>
+                            <p>Source: ${article.source.name}</p>
+                            <p>URL: ${article.url}</p>
+                            <p>Image: ${article.urlToImage ? 'Yes' : 'No'}</p>
+                            <hr>
+                        `;
+                        container.appendChild(div);
+                    });
+                } else {
+                    container.innerHTML = '<p>No articles found</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('articles').innerHTML = '<p>Error: ' + error.message + '</p>';
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html>

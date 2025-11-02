@@ -1,5 +1,17 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Setup
+
+Before running the project, you'll need to set up your environment variables:
+
+1. Copy `.env.example` to `.env.local`
+2. Add your SerpAPI key:
+   ```
+   SERPAPI_KEY=your_serpapi_key_here
+   ```
+   
+   Get your SerpAPI key from [https://serpapi.com/](https://serpapi.com/)
+
 ## Getting Started
 
 First, run the development server:
