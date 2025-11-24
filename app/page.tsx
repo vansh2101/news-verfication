@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { searchNewsThroughBackend } from "@/app/lib/newsAPI";
+import { searchNews } from "@/app/lib/newsAPI";
 import { Search, Menu, ChevronRight, Loader2 } from "lucide-react";
 import { VideoUploadModal } from "@/app/components/VideoUploadModal";
 import Footer from "@/app/components/Footer";
@@ -9,6 +10,8 @@ import { NewsletterSubscribe } from "@/app/components/NewsletterSubscribe";
 import { Card } from "../app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+
 
 interface NewsArticle {
   source: { id: string | null; name: string };
@@ -26,6 +29,9 @@ export default function NewsVerificationPage() {
   const [showNewsletter, setShowNewsletter] = useState(false);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<NewsArticle[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -168,10 +174,37 @@ export default function NewsVerificationPage() {
         <div className="flex items-center gap-3 bg-white border border-gray-300 rounded-lg px-3 py-2 w-64 shadow-sm focus-within:ring-2 focus-within:ring-orange-400 transition-all">
           <Search className="w-5 h-5 text-gray-500" />
           <input
-            type="text"
-            placeholder="Search..."
-            className="w-full outline-none text-gray-700 placeholder-gray-400"
-          />
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full outline-none text-gray-700 placeholder-gray-400"
+            />
+
+            <Button
+                onClick={async () => {
+                  console.log("Searching for:", searchQuery); // 👈 ADD THIS
+
+                  if (!searchQuery.trim()) return;
+                  setIsSearching(true);
+
+                  try {
+                    const { articles } = await searchNews(searchQuery);
+                    setSearchResults(articles.slice(0, 10));
+                    console.log("Search results:", articles); // OPTIONAL debug
+                  } catch (err) {
+                    console.error(err);
+                    setSearchResults([]);
+                  }
+
+                  setIsSearching(false);
+                }}
+                className="bg-orange-600 hover:bg-orange-700 text-white ml-3"
+              >
+                Search
+              </Button>
+
+
         </div>
       </div>
 
@@ -313,6 +346,41 @@ export default function NewsVerificationPage() {
             ))
           )}
         </div>
+
+        {searchResults.length > 0 && (
+            <section className="mt-16">
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                Search Results for: <span className="text-orange-500">{searchQuery}</span>
+              </h2>
+
+              {isSearching ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {searchResults.map((item, i) => (
+                    <a
+                      key={i}
+                      href={item.url}
+                      target="_blank"
+                      className="relative rounded-lg overflow-hidden h-64 border shadow hover:shadow-lg transition"
+                    >
+                      {item.urlToImage ? (
+                        <img src={item.urlToImage} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-gray-300"></div>
+                      )}
+                      <div className="absolute bottom-0 bg-black/70 text-white p-4 w-full">
+                        <h3 className="font-semibold text-lg">{item.title}</h3>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
 
         {/* 🔥 Highlighted Latest News Section */}
         <section id="latest" className="mt-24 py-16 bg-white rounded-3xl shadow-inner">
@@ -550,28 +618,40 @@ export default function NewsVerificationPage() {
               {
                 title: "Multimodal Misinformation Detection",
                 desc: "Analyze text, images, and videos together to detect manipulation and deepfakes in real time.",
+                img: "multimodal.png"
               },
               {
                 title: "Knowledge Graph Integration",
                 desc: "Cross-verify information from reliable databases using a multi-layer knowledge graph.",
+                img: "KG.png"
               },
               {
                 title: "Real-Time Event Validation",
                 desc: "Instantly validate live events such as elections, disasters, and news broadcasts.",
+                img: "event_validation.png"
               },
               {
                 title: "Profile Behavior Scoring",
                 desc: "Assess social media profiles based on activity, credibility, and influence.",
+                img: "profile_scoring.png"
               },
               {
                 title: "Dynamic Hashtag Analysis",
                 desc: "Predict and monitor trending hashtags to identify misinformation campaigns.",
+                img: "hastag.jpg"
               },
             ].map((feature, i) => (
               <div key={i} className="min-w-[320px] max-w-[350px] bg-white shadow-md rounded-2xl p-6 flex flex-col items-center justify-between border border-gray-100 hover:shadow-lg transition-all duration-300 flex-shrink-0">
-                <div className="w-full h-44 bg-gradient-to-br from-orange-100 to-blue-100 rounded-xl mb-5 flex items-center justify-center text-gray-400 text-sm italic">
-                  Media Placeholder
-                </div>
+                <div className="relative w-full h-44 rounded-xl overflow-hidden mb-5">
+              <Image
+                src={`/${feature.image}`}
+                alt={feature.title}
+                fill    // <-- THIS is required for responsive container sizing
+                className="object-cover"
+                sizes="100%"
+              />
+            </div>
+
                 <h3 className="text-xl font-semibold text-gray-800 mb-2 text-center">{feature.title}</h3>
                 <p className="text-gray-600 text-sm text-center">{feature.desc}</p>
               </div>
