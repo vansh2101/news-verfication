@@ -84,8 +84,10 @@ export function VerificationSummaryCard({
         </div>
         
         <div className="mb-4">
-          <p className="text-sm lg:text-base text-gray-700 leading-relaxed">
-            {verificationSummary}
+          <p className="text-sm lg:text-base text-gray-700 leading-relaxed line-clamp-4">
+            {verificationSummary && verificationSummary.length > 300 
+              ? verificationSummary.substring(0, 300) + '...' 
+              : verificationSummary}
           </p>
         </div>
 
@@ -105,12 +107,14 @@ export function VerificationSummaryCard({
       {/* Analysis Findings */}
       {reasons && reasons.length > 0 && (
         <div>
-          <h4 className="text-xl font-semibold text-gray-800 mb-4">Analysis Findings</h4>
+          <h4 className="text-xl font-semibold text-gray-800 mb-4">Key Recommendations</h4>
           <div className="space-y-3">
-            {reasons.map((reason, index) => (
-              <div key={index} className="flex items-start gap-4 bg-gray-50 border border-gray-200 rounded-xl p-5">
-                <div className="w-3 h-3 bg-orange-500 rounded-full mt-2 shrink-0"></div>
-                <p className="text-base text-gray-700 leading-relaxed">{reason}</p>
+            {reasons.slice(0, 3).map((reason, index) => (
+              <div key={index} className="flex items-start gap-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <div className="w-3 h-3 bg-orange-500 rounded-full mt-1.5 shrink-0"></div>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {reason.length > 150 ? reason.substring(0, 150) + '...' : reason}
+                </p>
               </div>
             ))}
           </div>

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { searchNewsThroughBackend } from "@/app/lib/newsAPI";
-import { searchNews } from "@/app/lib/newsAPI";
+import { searchNews } from "./lib/newsAPI";
 import { Search, Menu, ChevronRight, Loader2 } from "lucide-react";
 import { VideoUploadModal } from "@/app/components/VideoUploadModal";
 import Footer from "@/app/components/Footer";
@@ -39,11 +38,11 @@ export default function NewsVerificationPage() {
     try {
       setLoading(true);
 
-      // Instead of calling NewsAPI directly → call backend
-      const result = await searchNewsThroughBackend("top headlines");
+      // Fetch news articles from backend /search-news endpoint
+      const { articles: newsArticles } = await searchNews("latest news");
 
-      if (result && result.relatedArticles) {
-        setArticles(result.relatedArticles.slice(0, 10));
+      if (newsArticles && newsArticles.length > 0) {
+        setArticles(newsArticles.slice(0, 10));
       } else {
         setArticles([]);
       }
@@ -51,6 +50,7 @@ export default function NewsVerificationPage() {
       setLoading(false);
     } catch (error) {
       console.error("Error fetching news:", error);
+      setArticles([]); // Set empty array on error
       setLoading(false);
     }
   };
@@ -644,9 +644,9 @@ export default function NewsVerificationPage() {
               <div key={i} className="min-w-[320px] max-w-[350px] bg-white shadow-md rounded-2xl p-6 flex flex-col items-center justify-between border border-gray-100 hover:shadow-lg transition-all duration-300 flex-shrink-0">
                 <div className="relative w-full h-44 rounded-xl overflow-hidden mb-5">
               <Image
-                src={`/${feature.image}`}
+                src={`/${feature.img}`}
                 alt={feature.title}
-                fill    // <-- THIS is required for responsive container sizing
+                fill
                 className="object-cover"
                 sizes="100%"
               />

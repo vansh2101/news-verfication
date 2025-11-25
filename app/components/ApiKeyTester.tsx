@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { geminiService } from '@/app/lib/geminiService';
-import { newsApiService } from '@/app/lib/newsApi';
+import { geminiService } from '../lib/geminiService';
+import { newsApiService } from '../lib/newsAPI';
 
 interface ApiTestResult {
   success: boolean;

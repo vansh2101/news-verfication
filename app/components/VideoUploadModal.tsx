@@ -4,7 +4,7 @@ import type React from "react";
 import { useState, useRef } from "react";
 import { X, Play, LinkIcon, Type, Trash, Loader2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import { newsVerificationService, VerificationInput } from "@/app/lib/verificationService";
+import { verifyContent, verifyWithUpload } from "@/lib/api";
 
 export function VideoUploadModal({
   onClose,
@@ -76,43 +76,32 @@ export function VideoUploadModal({
     setVerificationError("");
 
     try {
-      // Process each type of input
-      const verificationPromises: Promise<any>[] = [];
+      let verificationResult;
 
-      if (textInput.trim()) {
-        const input: VerificationInput = {
-          type: 'text',
-          content: textInput.trim()
-        };
-        verificationPromises.push(newsVerificationService.verifyContent(input));
-      }
-
-      if (linkInput.trim()) {
-        const input: VerificationInput = {
-          type: 'link',
-          content: linkInput.trim()
-        };
-        verificationPromises.push(newsVerificationService.verifyContent(input));
-      }
-
+      // Check if we have a video file - use upload endpoint
       if (videoFiles.length > 0) {
-        // For video files, we'll use the filename as content for now
-        // In a real implementation, you'd extract video content or transcription
-        const input: VerificationInput = {
-          type: 'video',
-          content: videoFiles.map(f => f.name).join(', ')
-        };
-        verificationPromises.push(newsVerificationService.verifyContent(input));
+        verificationResult = await verifyWithUpload(
+          videoFiles[0],
+          linkInput.trim() || undefined,
+          textInput.trim() || undefined
+        );
+      } else {
+        // Use regular verify endpoint for text/link only
+        verificationResult = await verifyContent({
+          text: textInput.trim() || undefined,
+          link: linkInput.trim() || undefined,
+        });
       }
 
-      // Wait for all verifications to complete
-        const verificationResults = await Promise.all(verificationPromises);      // Create a combined result object
+      // Create a combined result object with the backend response
       const combinedResults = {
-        results: verificationResults,
+        result: verificationResult,
         types: uploadedTypes,
         timestamp: new Date().toISOString()
       };
 
+      console.log('[VideoUploadModal] Verification complete:', combinedResults);
+      
       // Store results in localStorage for the results page
       localStorage.setItem('verificationResults', JSON.stringify(combinedResults));
       

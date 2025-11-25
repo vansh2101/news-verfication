@@ -9,6 +9,7 @@ import { ConfidenceScoreBox } from "@/app/components/confidence-score-box";
 import { SourceBox } from "@/app/components/source-box";
 import { ClaimsDisplay } from "@/app/components/ClaimsDisplay";
 import { VerificationSummaryCard } from "@/app/components/VerificationSummaryCard";
+import { SupportingEvidenceGrid } from "@/app/components/SupportingEvidenceGrid";
 
 interface NewsArticle {
   title: string;
@@ -39,21 +40,35 @@ function CombinedResultsContent() {
       try {
         setLoading(true);
         
-        // Check if we have verification results from the verification process
+        // Check if we have verification results from the backend
         if (isVerified) {
           const storedResults = localStorage.getItem('verificationResults');
+          console.log('[Results Page] Raw localStorage data:', storedResults);
           if (storedResults) {
             const parsedResults = JSON.parse(storedResults);
+            console.log('[Results Page] Parsed results:', parsedResults);
             setVerificationResults(parsedResults);
             
-            // Use articles from verification results if available
-            if (parsedResults.results && parsedResults.results.length > 0) {
+            // Convert backend supporting_evidence to articles format
+            if (parsedResults.result?.supporting_evidence) {
+              const evidence = parsedResults.result.supporting_evidence;
               const allArticles: NewsArticle[] = [];
-              parsedResults.results.forEach((result: any) => {
-                if (result.relatedArticles) {
-                  allArticles.push(...result.relatedArticles);
-                }
-              });
+              
+              // Add news articles
+              if (evidence.news_articles) {
+                evidence.news_articles.forEach((article: any) => {
+                  allArticles.push({
+                    title: article.title,
+                    description: article.title,
+                    url: article.link,
+                    urlToImage: '',
+                    publishedAt: new Date().toISOString(),
+                    source: { name: article.source },
+                    content: article.title
+                  });
+                });
+              }
+              
               setArticles(allArticles.slice(0, 5));
               setLoading(false);
               return;
@@ -61,36 +76,11 @@ function CombinedResultsContent() {
           }
         }
         
-        // Fallback to regular news fetching
-        // const apiKey = process.env.NEXT_PUBLIC_NEWSAPI_KEY;
-        // if (!apiKey) {
-        //   throw new Error("News API key is not configured");
-        // }
-        // const response = await fetch(
-        //   `https://newsapi.org/v2/everything?q=${encodeURIComponent(queryParam)}&language=en&sortBy=publishedAt&pageSize=20&apiKey=${apiKey}`
-        // );
+        // No verification data - show empty state
         setArticles([]);
         setLoading(false);
-        return;
-        // if (!response.ok) {
-        //   throw new Error("Failed to fetch news");
-        // }
-        // const data = await response.json();
-        
-        // Filter articles to only include those with images AND descriptions
-        const validArticles = (data.articles || []).filter(
-          (article: NewsArticle) => 
-            article.urlToImage && 
-            article.urlToImage.trim() !== "" &&
-            article.description && 
-            article.description.trim() !== "" &&
-            article.title &&
-            article.title.trim() !== ""
-        );
-        
-        setArticles(validArticles.slice(0, 3));
       } catch (err: any) {
-        setError(err.message || "Error fetching news");
+        setError(err.message || "Error loading verification results");
       } finally {
         setLoading(false);
       }
@@ -111,78 +101,69 @@ function CombinedResultsContent() {
 
   // Create news data object with verification results if available
   const getNewsData = () => {
-    if (verificationResults && verificationResults.results) {
-      const firstResult = verificationResults.results[0];
+    // Use backend verification results
+    if (verificationResults?.result) {
+      const result = verificationResults.result;
+      const truthScore = result.truth_score || {};
       
       return {
-        verified: !firstResult.isLikelyMisinformation,
-        truthScore: firstResult.truthScore,
-        verificationSummary: firstResult.verificationSummary,
-        reasons: firstResult.reasons || [],
-        confidenceScores: firstResult.sources?.slice(0, 3).map((source: any) => ({
-          source: source.name,
-          score: source.reliability
-        })) || articles.slice(0, 3).map(article => ({
-          source: article.source.name,
-          score: getConfidenceScore(article.source.name)
-        })),
-        sources: firstResult.sources?.map((source: any) => ({
-          name: source.name,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          description: `${source.stance === 'supports' ? 'Supports' : source.stance === 'contradicts' ? 'Contradicts' : 'Neutral on'} the claims`,
-          url: source.url
-        })) || articles.map(article => ({
-          name: article.source.name,
-          date: new Date(article.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          description: `Verified news coverage from ${article.source.name}`,
-          url: article.url
-        })),
-        claims: firstResult.claims || [],
-        input: firstResult.input,
-        link: articles[0] ? {
-          title: articles[0].title,
-          description: articles[0].description || "No description available",
-          url: articles[0].url,
-          image: articles[0].urlToImage || "/placeholder-news.jpg",
+        verified: truthScore.verification_status !== 'Unverified',
+        truthScore: truthScore.overall_score || 0,
+        verificationSummary: truthScore.summary || result.analysis?.summary || 'No summary available',
+        reasons: truthScore.recommendations || [],
+        confidenceScores: [
+          { source: 'Factual Accuracy', score: truthScore.credibility?.factual_accuracy || 0 },
+          { source: 'Source Reliability', score: truthScore.credibility?.source_reliability || 0 },
+          { source: 'Consistency', score: truthScore.credibility?.consistency_score || 0 }
+        ],
+        sources: [
+          ...(result.supporting_evidence?.news_articles?.map((article: any) => ({
+            name: article.source,
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            description: article.title,
+            url: article.link
+          })) || []),
+          ...(result.supporting_evidence?.youtube_videos?.map((video: any) => ({
+            name: 'YouTube',
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            description: video.title,
+            url: video.link
+          })) || [])
+        ].slice(0, 5),
+        claims: truthScore.fact_breakdown?.map((fact: any) => ({
+          claim: fact.claim,
+          verification: fact.verification,
+          sources: fact.supporting_sources || []
+        })) || [],
+        input: result.input,
+        link: result.input?.link ? {
+          title: 'Provided Link',
+          description: result.input.link,
+          url: result.input.link,
+          image: '/placeholder-news.jpg',
         } : null,
-        video: articles[1] ? {
-          title: articles[1].title,
-          thumbnail: articles[1].urlToImage || "/placeholder-video.jpg",
-          duration: "3:45",
-          url: articles[1].url,
+        video: result.input?.video ? {
+          title: 'Provided Video',
+          thumbnail: '/placeholder-video.jpg',
+          duration: '3:45',
+          url: result.input.video,
         } : null,
-        text: firstResult.input?.extractedText || articles[2]?.content?.split('[')[0] || articles[2]?.description || "No content available",
+        text: result.input?.text || result.analysis?.summary || 'No content available',
       };
     }
 
-    // Fallback to original structure
+    // Fallback when no verification data
     return {
-      verified: articles.length > 0,
-      truthScore: 75,
-      confidenceScores: articles.slice(0, 3).map(article => ({
-        source: article.source.name,
-        score: getConfidenceScore(article.source.name)
-      })),
-      sources: articles.map(article => ({
-        name: article.source.name,
-        date: new Date(article.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        description: `Verified news coverage from ${article.source.name}`,
-        url: article.url
-      })),
+      verified: false,
+      truthScore: 0,
+      verificationSummary: 'No verification data available',
+      reasons: [],
+      confidenceScores: [],
+      sources: [],
       claims: [],
-      link: articles[0] ? {
-        title: articles[0].title,
-        description: articles[0].description || "No description available",
-        url: articles[0].url,
-        image: articles[0].urlToImage || "/placeholder-news.jpg",
-      } : null,
-      video: articles[1] ? {
-        title: articles[1].title,
-        thumbnail: articles[1].urlToImage || "/placeholder-video.jpg",
-        duration: "3:45",
-        url: articles[1].url,
-      } : null,
-      text: articles[2]?.content?.split('[0') || articles[2]?.description || "No content available",
+      link: null,
+      video: null,
+      text: 'No content available',
     };
   };
 
@@ -196,9 +177,13 @@ function CombinedResultsContent() {
       <div>
         <p className="font-semibold text-gray-700 mb-2">Confidence Scores</p>
         <div className="space-y-2">
-          {newsData.confidenceScores.map((item: any, idx: number) => (
-            <ConfidenceScoreBox key={idx} score={item.score} sourceName={item.source} />
-          ))}
+          {newsData.confidenceScores && newsData.confidenceScores.length > 0 ? (
+            newsData.confidenceScores.map((item: any, idx: number) => (
+              <ConfidenceScoreBox key={idx} score={item.score} sourceName={item.source} />
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">No confidence scores available</p>
+          )}
         </div>
 
         {/* 🟧 Expanded reliability section */}
@@ -245,16 +230,16 @@ function CombinedResultsContent() {
   const renderDetailedAnalysis = () => (
     <div className="space-y-6 lg:space-y-8">
       {/* Enhanced Verification Summary */}
-      {verificationResults && (
+      {verificationResults && verificationResults.result && (
         <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 shadow-sm">
           <VerificationSummaryCard
             truthScore={newsData.truthScore}
-            isLikelyMisinformation={verificationResults.results[0]?.isLikelyMisinformation || false}
+            isLikelyMisinformation={newsData.truthScore < 60}
             reasons={newsData.reasons || []}
             verificationSummary={newsData.verificationSummary || ""}
-            supportingArticles={verificationResults.results[0]?.supportingArticles || 0}
-            contradictingArticles={verificationResults.results[0]?.contradictingArticles || 0}
-            sources={verificationResults.results[0]?.sources || []}
+            supportingArticles={verificationResults.result.supporting_evidence?.news_articles?.length || 0}
+            contradictingArticles={0}
+            sources={newsData.sources || []}
           />
         </div>
       )}
@@ -262,176 +247,232 @@ function CombinedResultsContent() {
       {/* Claims Analysis Section */}
       {newsData.claims && newsData.claims.length > 0 && (
         <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 shadow-sm">
-          <h4 className="text-xl font-semibold text-gray-800 mb-4">Extracted Claims</h4>
+          <h4 className="text-xl font-semibold text-gray-800 mb-4">Fact Breakdown</h4>
           <ClaimsDisplay claims={newsData.claims} />
+        </div>
+      )}
+
+      {/* Supporting Evidence Section */}
+      {verificationResults?.result?.supporting_evidence && (
+        <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 shadow-sm">
+          <SupportingEvidenceGrid
+            youtube_videos={verificationResults.result.supporting_evidence.youtube_videos}
+            reddit_discussions={verificationResults.result.supporting_evidence.reddit_discussions}
+            twitter_posts={verificationResults.result.supporting_evidence.twitter_posts}
+            news_articles={verificationResults.result.supporting_evidence.news_articles}
+          />
         </div>
       )}
     </div>
   );
 
   // 🔸 Sources row under main content
-  const renderSourcesRow = () => (
-    <div className="mt-6 lg:mt-8">
-      <h4 className="text-lg font-semibold text-gray-800 mb-4">Verified Sources</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {newsData.sources.slice(0, 6).map((s: any, i: number) => (
-          <div
-            key={i}
-            className="flex justify-center"
-          >
-            <SourceBox {...s} />
-          </div>
-        ))}
+  const renderSourcesRow = () => {
+    if (!newsData.sources || newsData.sources.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="mt-6 lg:mt-8">
+        <h4 className="text-lg font-semibold text-gray-800 mb-4">Verified Sources</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {newsData.sources.slice(0, 6).map((s: any, i: number) => (
+            <div
+              key={i}
+              className="flex justify-center"
+            >
+              <SourceBox {...s} />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Render unified input content section (video, link, text combined)
+  const renderInputContent = () => {
+    const hasVideo = types.includes("video") && newsData.video;
+    const hasLink = types.includes("link") && newsData.link;
+    const hasText = types.includes("text");
+    const inputText = newsData.input?.text || newsData.text;
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">📥 Submitted Content</h3>
+        
+        {/* Video Card */}
+        {hasVideo && newsData.video && (
+          <Card className="p-4 border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
+                  <Play className="w-6 h-6 text-white fill-white" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-1">Video Content</p>
+                <h4 className="text-sm font-bold text-gray-800 truncate">{newsData.video.title}</h4>
+                <a
+                  href={newsData.video.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-orange-600 hover:text-orange-700 font-medium inline-flex items-center gap-1 mt-1"
+                >
+                  View Video <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Link Card */}
+        {hasLink && newsData.link && (
+          <Card className="p-4 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <ExternalLink className="w-6 h-6 text-white" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Web Link</p>
+                <a
+                  href={newsData.link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors truncate block"
+                >
+                  {newsData.link.url}
+                </a>
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2">{newsData.link.description}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Text Card */}
+        {hasText && inputText && (
+          <Card className="p-4 border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white rounded-xl shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">📝</span>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-1">Text Content</p>
+                <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">
+                  {inputText.length > 200 ? inputText.substring(0, 200) + '...' : inputText}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <main className="min-h-screen bg-white px-6 py-10">
-      <div className="max-w-7xl mx-auto space-y-24">
-        <h1 className="text-4xl font-bold text-black mb-8 text-center">
-          <span className="text-orange-500">Verification</span> Results
-        </h1>
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white px-4 sm:px-6 py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto">
+        {/* Header with Score Badge */}
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-4">
+            Verification <span className="text-orange-500">Results</span>
+          </h1>
+          {!loading && verificationResults && (
+            <div className="inline-flex items-center gap-3 bg-white border-2 border-gray-200 rounded-full px-6 py-3 shadow-lg">
+              <div className={`text-3xl font-bold ${
+                newsData.truthScore >= 80 ? 'text-green-600' :
+                newsData.truthScore >= 70 ? 'text-blue-600' :
+                newsData.truthScore >= 60 ? 'text-yellow-600' :
+                newsData.truthScore >= 50 ? 'text-orange-600' : 'text-red-600'
+              }`}>
+                {newsData.truthScore}%
+              </div>
+              <div className="text-left">
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Truth Score</p>
+                <p className="text-sm font-semibold text-gray-700">
+                  {newsData.truthScore >= 80 ? 'Highly Reliable' :
+                   newsData.truthScore >= 70 ? 'Reliable' :
+                   newsData.truthScore >= 60 ? 'Moderately Reliable' :
+                   newsData.truthScore >= 50 ? 'Low Reliability' : 'Unreliable'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {loading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-12 h-12 animate-spin text-orange-500" />
-            <span className="ml-3 text-lg text-gray-600">Loading news verification...</span>
+            <span className="ml-3 text-lg text-gray-600">Analyzing content...</span>
           </div>
         )}
 
         {error && (
           <div className="text-center py-20">
-            <p className="text-red-500 text-lg">{error}</p>
+            <div className="inline-flex items-center gap-3 bg-red-50 border-2 border-red-200 rounded-xl px-6 py-4">
+              <span className="text-3xl">⚠️</span>
+              <p className="text-red-600 text-lg font-semibold">{error}</p>
+            </div>
           </div>
         )}
 
-        {!loading && !error && articles.length === 0 && (
+        {!loading && !error && !verificationResults && (
           <div className="text-center py-20">
-            <p className="text-gray-500 text-lg">No news articles found. Try a different search query.</p>
+            <div className="inline-flex items-center gap-3 bg-gray-50 border-2 border-gray-200 rounded-xl px-6 py-4">
+              <span className="text-3xl">🔍</span>
+              <p className="text-gray-500 text-lg">No verification data available. Please submit content to verify.</p>
+            </div>
           </div>
         )}
 
-        {/* 🎥 VIDEO SECTION */}
-        {!loading && types.includes("video") && newsData.video && (
-          <section className="border-t-4 border-orange-500 pt-10">
-            <h2 className="text-2xl font-bold text-black mb-6">🎥 Video Verification</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-              {/* Sidebar */}
-              <div className="lg:col-span-3 lg:order-1">
-                {renderSidebar()}
-              </div>
+        {/* UNIFIED CONTENT SECTION - All modalities in one place */}
+        {!loading && !error && verificationResults && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            {/* Left Sidebar - Verification Status */}
+            <div className="lg:col-span-3 space-y-4">
+              <VerificationStatus isVerified={newsData.verified} truthScore={newsData.truthScore} />
 
-              {/* Main Content */}
-              <div className="lg:col-span-5 lg:order-2">
-                <Card className="p-6 border-2 border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-all">
-                  <a 
-                    href={newsData.video.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
-                  >
-                    <div className="relative group cursor-pointer">
-                      <img
-                        src={newsData.video.thumbnail}
-                        alt={newsData.video.title}
-                        className="w-full h-80 object-cover rounded-2xl"
-                      />
-                      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 flex items-center justify-center rounded-2xl transition">
-                        <Play className="w-16 h-16 text-white fill-white" />
-                      </div>
-                      <div className="absolute bottom-4 right-4 bg-black/80 text-white px-3 py-1 rounded text-sm font-medium">
-                        {newsData.video.duration}
-                      </div>
-                    </div>
-                    <h3 className="text-lg font-bold text-black mt-4 hover:text-orange-600 transition-colors">{newsData.video.title}</h3>
-                  </a>
-                </Card>
-
-                {renderSourcesRow()}
-              </div>
-
-              {/* Detailed Analysis - Right Side */}
-              <div className="lg:col-span-4 lg:order-3">
-                {renderDetailedAnalysis()}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 🔗 LINK SECTION */}
-        {!loading && types.includes("link") && newsData.link && (
-          <section className="border-t-4 border-orange-500 pt-10">
-            <h2 className="text-2xl font-bold text-black mb-6">
-              <span className="text-orange-500">Link</span> Verification
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-              {/* Sidebar */}
-              <div className="lg:col-span-3 lg:order-1">
-                {renderSidebar()}
-              </div>
-
-              {/* Main Content */}
-              <div className="lg:col-span-5 lg:order-2">
-                <Card className="p-6 border-2 border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-all">
-                  {newsData.link.image && (
-                    <img
-                      src={newsData.link.image}
-                      alt={newsData.link.title}
-                      className="w-full h-60 object-cover rounded-2xl mb-4"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+              {/* Confidence Scores */}
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-5 shadow-sm">
+                <p className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wide">Credibility Metrics</p>
+                <div className="space-y-3">
+                  {newsData.confidenceScores && newsData.confidenceScores.length > 0 ? (
+                    newsData.confidenceScores.map((item: any, idx: number) => (
+                      <ConfidenceScoreBox key={idx} score={item.score} sourceName={item.source} />
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-400">No scores available</p>
                   )}
-                  <h3 className="font-bold text-xl text-black mb-2">{newsData.link.title}</h3>
-                  <p className="text-sm text-gray-700 mb-4">{newsData.link.description}</p>
-                  <a
-                    href={newsData.link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-orange-600 hover:text-orange-700 font-semibold"
-                  >
-                    Visit Link <ExternalLink className="w-4 h-4" />
-                  </a>
-                </Card>
-
-                {renderSourcesRow()}
+                </div>
               </div>
 
-              {/* Detailed Analysis - Right Side */}
-              <div className="lg:col-span-4 lg:order-3">
-                {renderDetailedAnalysis()}
+              {/* Quick Summary */}
+              <div className="bg-gradient-to-br from-orange-50 to-white border-2 border-orange-200 rounded-xl p-5 shadow-sm">
+                <p className="font-bold text-orange-600 mb-2 text-sm uppercase tracking-wide">Verification Summary</p>
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  {newsData.verificationSummary && newsData.verificationSummary.length > 0 
+                    ? newsData.verificationSummary.slice(0, 150) + (newsData.verificationSummary.length > 150 ? '...' : '')
+                    : "Content has been cross-verified with multiple trusted sources."}
+                </p>
               </div>
             </div>
-          </section>
-        )}
 
-        {/* 📝 TEXT SECTION */}
-        {!loading && types.includes("text") && (
-          <section className="border-t-4 border-orange-500 pt-10">
-            <h2 className="text-2xl font-bold text-black mb-6">📝 Text Verification</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-              {/* Sidebar */}
-              <div className="lg:col-span-3 lg:order-1">
-                {renderSidebar()}
-              </div>
+            {/* Center - Input Content Cards */}
+            <div className="lg:col-span-5 space-y-6">
+              {renderInputContent()}
 
-              {/* Main Content */}
-              <div className="lg:col-span-5 lg:order-2">
-                <Card className="p-6 border-2 border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-all min-h-96">
-                  <p className="text-lg text-gray-800 leading-relaxed">{newsData.text}</p>
-                </Card>
-
-                {renderSourcesRow()}
-              </div>
-
-              {/* Detailed Analysis - Right Side */}
-              <div className="lg:col-span-4 lg:order-3">
-                {renderDetailedAnalysis()}
-              </div>
+              {/* Verified Sources */}
+              {renderSourcesRow()}
             </div>
-          </section>
+
+            {/* Right Sidebar - Detailed Analysis */}
+            <div className="lg:col-span-4 space-y-6">
+              {renderDetailedAnalysis()}
+            </div>
+          </div>
         )}
       </div>
     </main>
