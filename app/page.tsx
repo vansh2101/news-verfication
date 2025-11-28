@@ -9,7 +9,7 @@ import { Card } from "../app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { useRouter } from "next/navigation";
 import { newsApiService, NewsArticle as ImportedNewsArticle } from "@/lib/newsApi";
-
+import Image from "next/image";
 // Use the imported NewsArticle type
 type NewsArticle = ImportedNewsArticle;
 
@@ -550,28 +550,40 @@ export default function NewsVerificationPage() {
               {
                 title: "Multimodal Misinformation Detection",
                 desc: "Analyze text, images, and videos together to detect manipulation and deepfakes in real time.",
+                img: "multimodal.png"
               },
               {
                 title: "Knowledge Graph Integration",
                 desc: "Cross-verify information from reliable databases using a multi-layer knowledge graph.",
+                img: "KG.png"
               },
               {
                 title: "Real-Time Event Validation",
                 desc: "Instantly validate live events such as elections, disasters, and news broadcasts.",
+                img: "event_validation.png"
               },
               {
                 title: "Profile Behavior Scoring",
                 desc: "Assess social media profiles based on activity, credibility, and influence.",
+                img: "profile_scoring.png"
               },
               {
                 title: "Dynamic Hashtag Analysis",
                 desc: "Predict and monitor trending hashtags to identify misinformation campaigns.",
+                img: "hastag.jpg"
               },
             ].map((feature, i) => (
               <div key={i} className="min-w-[320px] max-w-[350px] bg-white shadow-md rounded-2xl p-6 flex flex-col items-center justify-between border border-gray-100 hover:shadow-lg transition-all duration-300 flex-shrink-0">
-                <div className="w-full h-44 bg-gradient-to-br from-orange-100 to-blue-100 rounded-xl mb-5 flex items-center justify-center text-gray-400 text-sm italic">
-                  Media Placeholder
-                </div>
+                <div className="relative w-full h-44 rounded-xl overflow-hidden mb-5">
+              <Image
+                src={`/${feature.img}`}
+                alt={feature.title}
+                fill
+                className="object-cover"
+                sizes="100%"
+              />
+            </div>
+
                 <h3 className="text-xl font-semibold text-gray-800 mb-2 text-center">{feature.title}</h3>
                 <p className="text-gray-600 text-sm text-center">{feature.desc}</p>
               </div>
