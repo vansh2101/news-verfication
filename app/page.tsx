@@ -10,8 +10,23 @@ import { Button } from "@/app/components/ui/button";
 import { useRouter } from "next/navigation";
 import { newsApiService, NewsArticle as ImportedNewsArticle } from "@/lib/newsApi";
 import Image from "next/image";
+import { ApiHealthCheck } from "@/app/components/ApiHealthCheck";
 // Use the imported NewsArticle type
 type NewsArticle = ImportedNewsArticle;
+
+// Fallback articles in case API fails
+const fallbackArticles: NewsArticle[] = [
+  {
+    source: { id: null, name: "Sample News" },
+    author: "News Team",
+    title: "Sample News Article - API Loading",
+    description: "This is a sample article displayed while we load the latest news.",
+    url: "#",
+    urlToImage: "/pic1.jpg",
+    publishedAt: new Date().toISOString(),
+    content: null
+  }
+];
 
 export default function NewsVerificationPage() {
   const [showModal, setShowModal] = useState(false);
@@ -27,7 +42,7 @@ export default function NewsVerificationPage() {
         const articles = await newsApiService.getTopHeadlines('us', 50);
         console.log("Raw articles received:", articles);
         
-        if (articles) {
+        if (articles && Array.isArray(articles)) {
           console.log(`Total articles: ${articles.length}`);
           // Filter articles to only include those with images and titles
           const validArticles = articles.filter(
@@ -43,16 +58,38 @@ export default function NewsVerificationPage() {
           console.log("Final articles to display:", finalArticles);
           setArticles(finalArticles);
         } else {
-          console.log("No articles received");
+          console.log("No articles received or invalid response format");
+          console.log("Response received:", articles);
         }
-        setLoading(false);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching news:", error);
+        console.error("Error message:", error.message);
+        console.error("Error details:", {
+          status: error.status,
+          statusText: error.statusText,
+          cause: error.cause
+        });
+        // Set some fallback articles or show error state
+        console.warn("Using fallback articles due to API error");
+        setArticles(fallbackArticles);
+      } finally {
         setLoading(false);
       }
     };
-    fetchNews();
-  }, []);
+    
+    // Add a maximum timeout for the entire fetch operation
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.warn("Fetch operation timed out, using fallback articles");
+        setArticles(fallbackArticles);
+        setLoading(false);
+      }
+    }, 35000); // 35 seconds total timeout
+    
+    fetchNews().finally(() => {
+      clearTimeout(timeoutId);
+    });
+  }, [loading]);
 
   // Tips array used by the 6-steps section
   const tips = [
@@ -298,9 +335,26 @@ export default function NewsVerificationPage() {
                 className="relative rounded-lg overflow-hidden h-64 group cursor-pointer block"
               >
                 {item.urlToImage ? (
-                  <img src={item.urlToImage} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition" onError={(e) => {(e.target as HTMLImageElement).src = "/pic2.jpg";}} />
+                  <img 
+                    src={item.urlToImage} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition" 
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent && !parent.querySelector('.fallback-placeholder')) {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'fallback-placeholder w-full h-full bg-gray-300 flex items-center justify-center';
+                        placeholder.innerHTML = '<span class="text-gray-500 text-sm">No Image Available</span>';
+                        parent.appendChild(placeholder);
+                      }
+                    }} 
+                  />
                 ) : (
-                  <div className="w-full h-full bg-gray-300" />
+                  <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">No Image Available</span>
+                  </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-6">
                   <div className="flex items-center gap-2 mb-3">
@@ -362,7 +416,7 @@ export default function NewsVerificationPage() {
                           alt={item.title}
                           className="w-full h-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/pic1.jpg";
+                            (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666' font-family='Arial, sans-serif' font-size='16'%3EImage not available%3C/text%3E%3C/svg%3E";
                           }}
                         />
                       ) : (
@@ -658,6 +712,9 @@ export default function NewsVerificationPage() {
 
       {/* Footer */}
       {/* <Footer /> */}
+
+      {/* Debug component - only shows in development */}
+      <ApiHealthCheck />
     </div>
   );
 }

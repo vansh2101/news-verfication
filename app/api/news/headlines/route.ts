@@ -4,21 +4,35 @@ const { getJson } = require("serpapi");
 async function getTopHeadlines(country: string = 'us', pageSize: number = 50) {
     const apiKey = process.env.SERPAPI_KEY;
     if (!apiKey) {
+      console.error('Environment variables:', {
+        hasApiKey: !!process.env.SERPAPI_KEY,
+        nodeEnv: process.env.NODE_ENV,
+        vercel: !!process.env.VERCEL,
+        allEnvKeys: Object.keys(process.env).filter(key => key.includes('SERP'))
+      });
       throw new Error('SerpAPI key is not configured. Please add SERPAPI_KEY to your environment variables.');
     }
     
+    console.log('Starting SerpAPI request with params:', { country, pageSize });
+    
     try {
       const searchResults = await new Promise((resolve, reject) => {
-        getJson({
+        const params = {
           api_key: apiKey,
           engine: "google_news",
           hl: "en",
           gl: country,
-          num: pageSize
-        }, (json: any) => {
+          num: Math.min(pageSize, 100) // Limit to prevent timeouts
+        };
+        
+        console.log('SerpAPI request params:', { ...params, api_key: '[REDACTED]' });
+        
+        getJson(params, (json: any) => {
           if (json.error) {
+            console.error('SerpAPI returned error:', json.error);
             reject(new Error(`SerpAPI error: ${json.error}`));
           } else {
+            console.log('SerpAPI response received, news_results count:', json.news_results?.length || 0);
             resolve(json);
           }
         });
@@ -26,7 +40,8 @@ async function getTopHeadlines(country: string = 'us', pageSize: number = 50) {
 
       const data = searchResults as any;
       
-      if (!data.news_results) {
+      if (!data.news_results || !Array.isArray(data.news_results)) {
+        console.warn('No news results found in response:', data);
         return [];
       }
 
@@ -103,10 +118,34 @@ export async function GET(request: NextRequest) {
   const country = searchParams.get('country') || 'us';
   const pageSize = searchParams.get('pageSize');
 
+  // Log environment for debugging
+  console.log('API Route Environment Check:', {
+    hasApiKey: !!process.env.SERPAPI_KEY,
+    nodeEnv: process.env.NODE_ENV,
+    vercel: !!process.env.VERCEL
+  });
+
   try {
     const articles = await getTopHeadlines(country, pageSize ? parseInt(pageSize) : 50);
-    return NextResponse.json(articles);
+    
+    console.log(`Successfully fetched ${articles.length} articles`);
+    
+    return NextResponse.json(articles, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600', // Cache for 5 minutes
+      }
+    });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('API Route Error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    return NextResponse.json({ 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    }, { status: 500 });
   }
 }
