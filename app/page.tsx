@@ -260,7 +260,7 @@ export default function NewsVerificationPage() {
                 <div className="w-3/5 p-5 flex flex-col justify-between">
                   <div>
                     <h3 className="font-bold text-gray-900 mb-2 text-md leading-tight">{item.title}</h3>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{item.description || "No description available"}</p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{item.description}</p>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-orange-600 font-semibold">{item.source.name}</span>
@@ -371,7 +371,7 @@ export default function NewsVerificationPage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2 leading-tight">{item.title}</h3>
-                    <p className="text-sm text-gray-600">{item.description || "No description available"}</p>
+                    <p className="text-sm text-gray-600">{item.description}</p>
                   </a>
                 ))}
                 <div className="min-w-[340px] flex-shrink-0" aria-hidden />
